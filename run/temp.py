@@ -14,7 +14,7 @@ import time
 from PIL import Image,ImageDraw,ImageFont
 import traceback
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 try:
     logging.info("temp cpu")
@@ -37,17 +37,49 @@ try:
     
     epd.init(epd.PART_UPDATE)
     num = 0
+    failedtimes = 0
     while (True):
-        time_draw.rectangle((20, 40, 220, 105), fill = 255)
-        response = requests.get("http://127.0.0.1:3000/signalk/v1/api/vessels/self/environment/cpu/temperature/value")
+        try:
+            response = requests.get("http://10.10.10.1:3000/signalk/v1/api/vessels/self/navigation", timeout=10)
+        except Exception as e:
+            logging.info("Godmiljaar")
+            
+            if failedtimes == 0:
+                logging.info(failedtimes)
+                epd.init(epd.FULL_UPDATE)
+                imageclear = Image.new('1', (epd.height, epd.width), 255)
+                drawclear = ImageDraw.Draw(imageclear)
+                drawclear.text((15, 40), "Where is WALVS?", font = font24, fill = 0)
+                epd.display(epd.getbuffer(imageclear))
+            failedtimes = failedtimes + 1
+            time.sleep(30)
+            continue
+        
+        
+        
+        epd.init(epd.PART_UPDATE)
+        time_draw.rectangle((15, 15, 250, 115), fill = 255)
+        
+        #response = requests.get("http://10.10.10.1:3000/signalk/v1/api/vessels/self/navigation")      
         temp = response.json()
+        failedtimes = 0
         #logging.info(temp)
-        time_draw.text((20, 40), str(int(temp)), font = font40, fill = 0)
+        speedstring = str(temp["averageSpeedOverGround"]["value"])[:5] + " kts"
+        time_draw.text((15, 15), str(speedstring), font = font40, fill = 0)
+        
+        #coursestring = "C: " + str(temp["courseOverGroundTrue"]["value"])
+        coursestring = str(temp["gnss"]["antennaAltitude"]["value"])
+
+        time_draw.text((15, 70), str(coursestring[:10]), font = font40, fill = 0)
         epd.displayPartial(epd.getbuffer(time_image))
         time.sleep(2)
         num = num + 1
-        if(num == 50):
-            break
+        if(num == 30):
+            epd.init(epd.FULL_UPDATE)
+            epd.Clear(0xFF)
+            #imageclear = Image.new('1', (epd.height, epd.width), 255)
+            #epd.display(epd.getbuffer(imageclear))
+            num=0
 
     logging.info("Clear...")
     epd.init(epd.FULL_UPDATE)
